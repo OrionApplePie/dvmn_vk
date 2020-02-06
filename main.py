@@ -1,7 +1,11 @@
+#!/usr/bin/env python3
 import os
 from pathlib import Path
 
 import requests
+from requests.compat import urlparse
+
+DEFAULT_CHUNK_SIZE = 1024
 
 
 def download_image(url="", img_path="", img_name="", rewrite=True):
@@ -26,3 +30,31 @@ def download_image(url="", img_path="", img_name="", rewrite=True):
         for chunk in response.iter_content(DEFAULT_CHUNK_SIZE):
             file.write(chunk)
     return file_name
+
+
+def get_url_filename(url=""):
+    """Извлекает имя файла картинки с расширением из урла."""
+    parsed_url = urlparse(url)
+    return os.path.basename(parsed_url.path)
+
+
+def main():
+    files_folder = "Files"
+
+    base_url = "http://xkcd.com/{comic_number}/info.0.json"
+    url = base_url.format(comic_number=614)
+    r = requests.get(url=url)
+    r.raise_for_status()
+    r_json = r.json()
+    img_url = r_json["img"]
+    comic_img_name = get_url_filename(img_url)
+
+    img_path = download_image(
+        url=img_url,
+        img_path=files_folder,
+        img_name=comic_img_name
+    )
+
+
+if __name__ == "__main__":
+    main()
