@@ -6,6 +6,7 @@ import requests
 from requests.compat import urlparse
 
 DEFAULT_CHUNK_SIZE = 1024
+FILES_FOLDER = "images"
 
 
 def download_image(url="", img_path="", img_name="", rewrite=True):
@@ -39,19 +40,22 @@ def get_url_filename(url=""):
 
 
 def main():
-    files_folder = "Files"
-
     base_url = "http://xkcd.com/{comic_number}/info.0.json"
     url = base_url.format(comic_number=614)
+
     r = requests.get(url=url)
     r.raise_for_status()
     r_json = r.json()
+
+    comic_comment = r_json["alt"]
+    print(comic_comment)
+
     img_url = r_json["img"]
     comic_img_name = get_url_filename(img_url)
 
     img_path = download_image(
         url=img_url,
-        img_path=files_folder,
+        img_path=FILES_FOLDER,
         img_name=comic_img_name
     )
 
