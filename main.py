@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 import os
+import json
 from pathlib import Path
 
 import requests
-from requests.compat import urlparse
+from requests.compat import urlparse, urljoin
 
 from dotenv import find_dotenv, load_dotenv
 
 DEFAULT_CHUNK_SIZE = 1024
 FILES_FOLDER = "images"
+
+VK_API_VERSION = "5.103"
+VK_API_METHODS_BASE_URL = "https://api.vk.com/method/"
 
 
 def implicit_flow():
@@ -29,6 +33,28 @@ def implicit_flow():
         params=params
     )
     print(response.url)
+
+
+def get_comm_vk():
+    """Returns a list of the communities to which a user belongs using VK API."""
+    api_method_name = "groups.get"
+    access_token = os.getenv("VK_APP_ACCESS_TOKEN")
+
+    params = {
+        "extended": 1,
+        "access_token": access_token,
+        "v": "5.103",
+    }
+    comm_response = requests.get(
+        url=urljoin(VK_API_METHODS_BASE_URL, api_method_name),
+        params=params,
+    )
+
+    # with open("comm_data.txt", "w") as out_file:
+    #     json.dump(comm_response.json(), out_file)
+
+    print(comm_response.url)
+    # print(comm_response.json())
 
 
 def download_image(url="", img_path="", img_name="", rewrite=True):
@@ -82,6 +108,8 @@ def main():
     )
 
     implicit_flow()
+
+    get_comm_vk()
 
 
 if __name__ == "__main__":
