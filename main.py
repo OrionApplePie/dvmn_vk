@@ -13,6 +13,8 @@ FILES_FOLDER = "images"
 
 VK_API_VERSION = "5.103"
 VK_API_METHODS_BASE_URL = "https://api.vk.com/method/"
+VK_MY_COMMUNITY_ID = 166256394
+VK_ALBUM_ID = 252690866
 
 
 def implicit_flow():
@@ -57,6 +59,60 @@ def get_comm_vk():
     # print(comm_response.json())
 
 
+def get_upload_url():
+    """Returns the server address for photo upload onto a album."""
+    api_method_name = "photos.getUploadServer"
+    access_token = os.getenv("VK_APP_ACCESS_TOKEN")
+
+    params = {
+        "album_id": VK_ALBUM_ID,
+        "group_id": VK_MY_COMMUNITY_ID,
+        "access_token": access_token,
+        "v": "5.103",
+    }
+    response = requests.get(
+        url=urljoin(VK_API_METHODS_BASE_URL, api_method_name),
+        params=params,
+    )
+    print(response.json())
+    print("-->"*12)
+    return response.json()["response"]["upload_url"]
+
+
+def upload_image_vk(img="", url=""):
+    with open(img, "rb") as image_file:
+        files = {
+            "photo": image_file
+        }
+        response = requests.post(url=url, files=files)
+        response.raise_for_status()
+        return response.json()
+
+
+def save_image_to_album(upload_response=None):
+    api_method_name = "photos.save"
+    access_token = os.getenv("VK_APP_ACCESS_TOKEN")
+
+    params = {
+        "group_id": VK_MY_COMMUNITY_ID,
+        "album_id": VK_ALBUM_ID,
+        "photos_list": upload_response["photos_list"],
+        "server": upload_response["server"],
+        "hash": upload_response["hash"],
+        # "latitude": upload_response["latitude"],
+        # "longitude": upload_response["longitude"],
+        "caption": "test",
+        "access_token": access_token,
+        "v": "5.103",
+    }
+    response = requests.get(
+        url=urljoin(VK_API_METHODS_BASE_URL, api_method_name),
+        params=params,
+    )
+    response.raise_for_status()
+    print(response.json())
+
+
 def download_image(url="", img_path="", img_name="", rewrite=True):
     """Function for downloading image by given url
     and saving it to given folder."""
@@ -95,8 +151,8 @@ def main():
     r.raise_for_status()
     r_json = r.json()
 
-    comic_comment = r_json["alt"]
-    print(comic_comment)
+    # comic_comment = r_json["alt"]
+    # print(comic_comment)
 
     img_url = r_json["img"]
     comic_img_name = get_url_filename(img_url)
@@ -107,9 +163,15 @@ def main():
         img_name=comic_img_name
     )
 
-    implicit_flow()
+    # implicit_flow()
+    # get_comm_vk()
 
-    get_comm_vk()
+    upload_url = get_upload_url()
+
+    upload_resp = upload_image_vk(img_path, upload_url)
+    print(upload_resp)
+    print("---"*12)
+    save_image_to_album(upload_resp)
 
 
 if __name__ == "__main__":
