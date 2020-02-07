@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-import os
 import json
+import os
+import random
 from pathlib import Path
 
 import requests
-from requests.compat import urlparse, urljoin
-
 from dotenv import find_dotenv, load_dotenv
+from requests.compat import urljoin, urlparse
 
 DEFAULT_CHUNK_SIZE = 1024
 FILES_FOLDER = "images"
+
+XKCD_COMICS_URL = "http://xkcd.com/{comic_number}/info.0.json"
+XKCD_CURRENT_URL = "https://xkcd.com/info.0.json"
 
 VK_API_VERSION = "5.103"
 VK_API_METHODS_BASE_URL = "https://api.vk.com/method/"
@@ -144,17 +147,23 @@ def post_wall_photo(save_image_response=None, message=""):
     return response.json()
 
 
-def main():
-    base_url = "http://xkcd.com/{comic_number}/info.0.json"
-    url = base_url.format(comic_number=614)
+def download_random_comics():
+    curr_comics_resp = requests.get(
+        url=XKCD_CURRENT_URL
+    )
+    curr_comics_resp.raise_for_status()
 
-    r = requests.get(url=url)
-    r.raise_for_status()
-    r_json = r.json()
+    curr_comics_num = curr_comics_resp.json()["num"]
+    random_comics_num = random.randint(1, curr_comics_num)
 
-    comic_comment = r_json["alt"]
+    url = XKCD_COMICS_URL.format(comic_number=random_comics_num)
 
-    img_url = r_json["img"]
+    resp = requests.get(url=url)
+    resp.raise_for_status()
+    
+    resp_json = resp.json()
+    comic_comment = resp_json["alt"]
+    img_url = resp_json["img"]
     comic_img_name = get_url_filename(img_url)
 
     img_path = download_image(
@@ -163,17 +172,26 @@ def main():
         img_name=comic_img_name
     )
 
+    return {
+        "img_path": img_path,
+        "comment": comic_comment,
+    }
+
+
+def main():
+    photo_path, message = download_random_comics().values()
+
     upload_url = get_wall_upload_url(vk_group_id=VK_MY_COMMUNITY_ID)
     print(f"upload url --> {upload_url}\n")
 
-    upload_resp = upload_image_vk(img_path, upload_url)
+    upload_resp = upload_image_vk(photo_path, upload_url)
     print(f"upload response --> {upload_resp}\n")
 
     save_resp = save_wall_photo(upload_response=upload_resp)
     print(f"save photo vk group album response --> {save_resp}\n")
 
     post_resp = post_wall_photo(
-        save_image_response=save_resp, message=comic_comment
+        save_image_response=save_resp, message=message
     )
     print(post_resp)
 
