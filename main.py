@@ -5,8 +5,30 @@ from pathlib import Path
 import requests
 from requests.compat import urlparse
 
+from dotenv import find_dotenv, load_dotenv
+
 DEFAULT_CHUNK_SIZE = 1024
 FILES_FOLDER = "images"
+
+
+def implicit_flow():
+    client_id = os.getenv("VK_CLIENT_ID")
+
+    auth_url = "https://oauth.vk.com/authorize"
+    params = {
+        "client_id": client_id,
+        # "redirect_uri": "",
+        "display": "page",
+        "scope": "photos,groups,wall,offline",
+        "response_type": "token",
+        "v": "5.103",
+    }
+
+    response = requests.get(
+        url=auth_url,
+        params=params
+    )
+    print(response.url)
 
 
 def download_image(url="", img_path="", img_name="", rewrite=True):
@@ -59,6 +81,9 @@ def main():
         img_name=comic_img_name
     )
 
+    implicit_flow()
+
 
 if __name__ == "__main__":
+    load_dotenv(find_dotenv())
     main()
