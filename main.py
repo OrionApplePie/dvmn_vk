@@ -14,103 +14,12 @@ FILES_FOLDER = "images"
 VK_API_VERSION = "5.103"
 VK_API_METHODS_BASE_URL = "https://api.vk.com/method/"
 VK_MY_COMMUNITY_ID = 166256394
-VK_ALBUM_ID = 252690866
 
 
-def implicit_flow():
-    client_id = os.getenv("VK_CLIENT_ID")
-
-    auth_url = "https://oauth.vk.com/authorize"
-    params = {
-        "client_id": client_id,
-        # "redirect_uri": "",
-        "display": "page",
-        "scope": "photos,groups,wall,offline",
-        "response_type": "token",
-        "v": "5.103",
-    }
-
-    response = requests.get(
-        url=auth_url,
-        params=params
-    )
-    print(response.url)
-
-
-def get_comm_vk():
-    """Returns a list of the communities to which a user belongs using VK API."""
-    api_method_name = "groups.get"
-    access_token = os.getenv("VK_APP_ACCESS_TOKEN")
-
-    params = {
-        "extended": 1,
-        "access_token": access_token,
-        "v": "5.103",
-    }
-    comm_response = requests.get(
-        url=urljoin(VK_API_METHODS_BASE_URL, api_method_name),
-        params=params,
-    )
-
-    # with open("comm_data.txt", "w") as out_file:
-    #     json.dump(comm_response.json(), out_file)
-
-    print(comm_response.url)
-    # print(comm_response.json())
-
-
-def get_upload_url():
-    """Returns the server address for photo upload onto a album."""
-    api_method_name = "photos.getUploadServer"
-    access_token = os.getenv("VK_APP_ACCESS_TOKEN")
-
-    params = {
-        "album_id": VK_ALBUM_ID,
-        "group_id": VK_MY_COMMUNITY_ID,
-        "access_token": access_token,
-        "v": "5.103",
-    }
-    response = requests.get(
-        url=urljoin(VK_API_METHODS_BASE_URL, api_method_name),
-        params=params,
-    )
-    print(response.json())
-    print("-->"*12)
-    return response.json()["response"]["upload_url"]
-
-
-def upload_image_vk(img="", url=""):
-    with open(img, "rb") as image_file:
-        files = {
-            "photo": image_file
-        }
-        response = requests.post(url=url, files=files)
-        response.raise_for_status()
-        return response.json()
-
-
-def save_image_to_album(upload_response=None):
-    api_method_name = "photos.save"
-    access_token = os.getenv("VK_APP_ACCESS_TOKEN")
-
-    params = {
-        "group_id": VK_MY_COMMUNITY_ID,
-        "album_id": VK_ALBUM_ID,
-        "photos_list": upload_response["photos_list"],
-        "server": upload_response["server"],
-        "hash": upload_response["hash"],
-        # "latitude": upload_response["latitude"],
-        # "longitude": upload_response["longitude"],
-        "caption": "test",
-        "access_token": access_token,
-        "v": "5.103",
-    }
-    response = requests.get(
-        url=urljoin(VK_API_METHODS_BASE_URL, api_method_name),
-        params=params,
-    )
-    response.raise_for_status()
-    print(response.json())
+def get_url_filename(url=""):
+    """Извлекает имя файла картинки с расширением из урла."""
+    parsed_url = urlparse(url)
+    return os.path.basename(parsed_url.path)
 
 
 def download_image(url="", img_path="", img_name="", rewrite=True):
@@ -137,10 +46,102 @@ def download_image(url="", img_path="", img_name="", rewrite=True):
     return file_name
 
 
-def get_url_filename(url=""):
-    """Извлекает имя файла картинки с расширением из урла."""
-    parsed_url = urlparse(url)
-    return os.path.basename(parsed_url.path)
+def get_comm_vk():
+    """Returns a list of the communities to which a user belongs using VK API."""
+    api_method_name = "groups.get"
+    access_token = os.getenv("VK_APP_ACCESS_TOKEN")
+
+    params = {
+        "extended": 1,
+        "access_token": access_token,
+        "v": "5.103",
+    }
+    comm_response = requests.get(
+        url=urljoin(VK_API_METHODS_BASE_URL, api_method_name),
+        params=params,
+    )
+
+    print(comm_response.json())
+
+
+def get_wall_upload_url(vk_group_id=None):
+    """Получение ссылки для загрузки фото на сервер ВК
+    для последующей публикации на стену группы."""
+    api_method_name = "photos.getWallUploadServer"
+    access_token = os.getenv("VK_APP_ACCESS_TOKEN")
+
+    params = {
+        "group_id": vk_group_id,
+
+        "access_token": access_token,
+        "v": "5.103",
+    }
+    response = requests.get(
+        url=urljoin(VK_API_METHODS_BASE_URL, api_method_name),
+        params=params,
+    )
+
+    return response.json()["response"]["upload_url"]
+
+
+def upload_image_vk(img="", url=""):
+    """Загрузка фото на заданный урл."""
+    with open(img, "rb") as image_file:
+        files = {
+            "photo": image_file
+        }
+        response = requests.post(url=url, files=files)
+        response.raise_for_status()
+        return response.json()
+
+
+def save_wall_photo(upload_response=None):
+    """Сохранение фото для публикации на стене."""
+    api_method_name = "photos.saveWallPhoto"
+    access_token = os.getenv("VK_APP_ACCESS_TOKEN")
+
+    params = {
+        "group_id": VK_MY_COMMUNITY_ID,
+        "photo": upload_response["photo"],
+        "server": upload_response["server"],
+        "hash": upload_response["hash"],
+        "caption": "test caption",
+        "access_token": access_token,
+        "v": "5.103",
+    }
+    response = requests.post(
+        url=urljoin(VK_API_METHODS_BASE_URL, api_method_name),
+        data=params,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def post_wall_photo(save_image_response=None, message=""):
+    """Публикация фото на стене группы."""
+    api_method_name = "wall.post"
+    access_token = os.getenv("VK_APP_ACCESS_TOKEN")
+    resp = save_image_response["response"][0]
+
+    attachment_str = "".join([
+        "photo", str(resp["owner_id"]), "_", str(resp["id"])
+    ])
+    params = {
+        "owner_id": -VK_MY_COMMUNITY_ID,
+        "from_group": 1,
+        "message": message,
+        "attachments": attachment_str,
+        "group_id": VK_MY_COMMUNITY_ID,
+
+        "access_token": access_token,
+        "v": "5.103",
+    }
+    response = requests.post(
+        url=urljoin(VK_API_METHODS_BASE_URL, api_method_name),
+        data=params,
+    )
+    response.raise_for_status()
+    return response.json()
 
 
 def main():
@@ -151,8 +152,7 @@ def main():
     r.raise_for_status()
     r_json = r.json()
 
-    # comic_comment = r_json["alt"]
-    # print(comic_comment)
+    comic_comment = r_json["alt"]
 
     img_url = r_json["img"]
     comic_img_name = get_url_filename(img_url)
@@ -163,15 +163,19 @@ def main():
         img_name=comic_img_name
     )
 
-    # implicit_flow()
-    # get_comm_vk()
-
-    upload_url = get_upload_url()
+    upload_url = get_wall_upload_url(vk_group_id=VK_MY_COMMUNITY_ID)
+    print(f"upload url --> {upload_url}\n")
 
     upload_resp = upload_image_vk(img_path, upload_url)
-    print(upload_resp)
-    print("---"*12)
-    save_image_to_album(upload_resp)
+    print(f"upload response --> {upload_resp}\n")
+
+    save_resp = save_wall_photo(upload_response=upload_resp)
+    print(f"save photo vk group album response --> {save_resp}\n")
+
+    post_resp = post_wall_photo(
+        save_image_response=save_resp, message=comic_comment
+    )
+    print(post_resp)
 
 
 if __name__ == "__main__":
