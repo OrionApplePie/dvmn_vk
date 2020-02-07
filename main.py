@@ -7,6 +7,7 @@ from pathlib import Path
 import requests
 from dotenv import find_dotenv, load_dotenv
 from requests.compat import urljoin, urlparse
+from requests.exceptions import ConnectionError, HTTPError
 
 DEFAULT_CHUNK_SIZE = 1024
 FILES_FOLDER = "images"
@@ -26,8 +27,8 @@ def get_url_filename(url=""):
 
 
 def download_image(url="", img_path="", img_name="", rewrite=True):
-    """Function for downloading image by given url
-    and saving it to given folder."""
+    """Функция для скачивания файла изображения
+    по заданному url и сохранения по заданному пути."""
 
     os.makedirs(img_path, exist_ok=True)
 
@@ -49,24 +50,6 @@ def download_image(url="", img_path="", img_name="", rewrite=True):
     return file_name
 
 
-def get_comm_vk():
-    """Returns a list of the communities to which a user belongs using VK API."""
-    api_method_name = "groups.get"
-    access_token = os.getenv("VK_APP_ACCESS_TOKEN")
-
-    params = {
-        "extended": 1,
-        "access_token": access_token,
-        "v": "5.103",
-    }
-    comm_response = requests.get(
-        url=urljoin(VK_API_METHODS_BASE_URL, api_method_name),
-        params=params,
-    )
-
-    print(comm_response.json())
-
-
 def get_wall_upload_url(vk_group_id=None):
     """Получение ссылки для загрузки фото на сервер ВК
     для последующей публикации на стену группы."""
@@ -77,19 +60,20 @@ def get_wall_upload_url(vk_group_id=None):
         "group_id": vk_group_id,
 
         "access_token": access_token,
-        "v": "5.103",
+        "v": VK_API_VERSION,
     }
     response = requests.get(
         url=urljoin(VK_API_METHODS_BASE_URL, api_method_name),
         params=params,
     )
+    response.raise_for_status()
 
     return response.json()["response"]["upload_url"]
 
 
-def upload_image_vk(img="", url=""):
-    """Загрузка фото на заданный урл."""
-    with open(img, "rb") as image_file:
+def upload_image_vk(img_path="", url=""):
+    """Загрузка фото на заданный url."""
+    with open(img_path, "rb") as image_file:
         files = {
             "photo": image_file
         }
@@ -108,9 +92,9 @@ def save_wall_photo(upload_response=None):
         "photo": upload_response["photo"],
         "server": upload_response["server"],
         "hash": upload_response["hash"],
-        "caption": "test caption",
+        "caption": "new caption!",
         "access_token": access_token,
-        "v": "5.103",
+        "v": VK_API_VERSION,
     }
     response = requests.post(
         url=urljoin(VK_API_METHODS_BASE_URL, api_method_name),
@@ -137,7 +121,7 @@ def post_wall_photo(save_image_response=None, message=""):
         "group_id": VK_MY_COMMUNITY_ID,
 
         "access_token": access_token,
-        "v": "5.103",
+        "v": VK_API_VERSION,
     }
     response = requests.post(
         url=urljoin(VK_API_METHODS_BASE_URL, api_method_name),
@@ -179,21 +163,23 @@ def download_random_comics():
 
 
 def main():
-    photo_path, message = download_random_comics().values()
+    try:
+        photo_path, message = download_random_comics().values()
 
-    upload_url = get_wall_upload_url(vk_group_id=VK_MY_COMMUNITY_ID)
-    print(f"upload url --> {upload_url}\n")
+        upload_url = get_wall_upload_url(vk_group_id=VK_MY_COMMUNITY_ID)
+        upload_resp = upload_image_vk(photo_path, upload_url)
 
-    upload_resp = upload_image_vk(photo_path, upload_url)
-    print(f"upload response --> {upload_resp}\n")
+        save_resp = save_wall_photo(upload_response=upload_resp)
+        post_resp = post_wall_photo(
+            save_image_response=save_resp, message=message
+        )
+    except HTTPError as error:
+        exit("Невозможно получить данные с сервера:\n{0}\n".format(error))
 
-    save_resp = save_wall_photo(upload_response=upload_resp)
-    print(f"save photo vk group album response --> {save_resp}\n")
+    except ConnectionError as error:
+        exit("Проблема с сетевым соединением:\n{0}\n".format(error))
 
-    post_resp = post_wall_photo(
-        save_image_response=save_resp, message=message
-    )
-    print(post_resp)
+    os.remove(photo_path)
 
 
 if __name__ == "__main__":
