@@ -46,11 +46,9 @@ def download_image(url="", img_path="", img_name="", rewrite=True):
         with open(file_name, 'wb') as file:
             for chunk in response.iter_content(DEFAULT_CHUNK_SIZE):
                 file.write(chunk)
-                # raise ValueError
     except IOError as error:
-        exit("Ошибка записи файла\n{0}\n}".format(error))
-    # finally:
-        # os.remove(file_name)
+        os.remove(file_name)
+        exit("Ошибка записи файла\n{0}\n".format(error))
     return file_name
 
 
@@ -69,9 +67,14 @@ def get_wall_upload_url(vk_group_id=None, access_token=""):
         url=urljoin(VK_API_METHODS_BASE_URL, api_method_name),
         params=params,
     )
-    response.raise_for_status()
 
-    return response.json()["response"]["upload_url"]
+    response.raise_for_status()
+    response_data = response.json()
+
+    if "error" in response_data:
+        raise HTTPError(response_data["error"]["error_msg"])
+
+    return response_data["response"]["upload_url"]
 
 
 def upload_image_vk(img_path="", url=""):
@@ -82,7 +85,12 @@ def upload_image_vk(img_path="", url=""):
         }
         response = requests.post(url=url, files=files)
         response.raise_for_status()
-        return response.json()
+        response_data = response.json()
+
+        if "error" in response_data:
+            raise HTTPError(response_data["error"]["error_msg"])
+
+        return response_data
 
 
 def save_wall_photo(upload_response=None, access_token=""):
@@ -104,7 +112,12 @@ def save_wall_photo(upload_response=None, access_token=""):
         data=params,
     )
     response.raise_for_status()
-    return response.json()
+    response_data = response.json()
+
+    if "error" in response_data:
+        raise HTTPError(response_data["error"]["error_msg"])
+
+    return response_data
 
 
 def post_wall_photo(save_image_response=None, message="", access_token=""):
@@ -130,7 +143,12 @@ def post_wall_photo(save_image_response=None, message="", access_token=""):
         data=params,
     )
     response.raise_for_status()
-    return response.json()
+    response_data = response.json()
+
+    if "error" in response_data:
+        raise HTTPError(response_data["error"]["error_msg"])
+
+    return response_data
 
 
 def download_random_comics():
@@ -193,6 +211,11 @@ def main():
 
     except ConnectionError as error:
         exit("Проблема с сетевым соединением:\n{0}\n".format(error))
+
+    finally:
+        for root, _, files in os.walk(FILES_FOLDER):
+            for file in files:
+                os.remove(os.path.join(root, file))
 
 
 if __name__ == "__main__":
